@@ -13,7 +13,8 @@ BLSKY_APP_PASSWORD = os.environ['BLSKY_APP_PASSWORD']
 seen_ids = set()
 
 # Set up translation (English to Spanish)
-translator = MyMemoryTranslator(source='en', target='es')
+translator = MyMemoryTranslator(source='en-US', target='es-MX')
+
 
 # Set up Bluesky client
 client = Client()
