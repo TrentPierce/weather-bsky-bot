@@ -64,3 +64,19 @@ fetch_and_post_alerts()
 while True:
     schedule.run_pending()
     time.sleep(30)
+
+# Fake HTTP server to keep Render Web Service alive
+from threading import Thread
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'Weather bot is running!')
+
+def run_server():
+    server = HTTPServer(('0.0.0.0', 10000), Handler)
+    server.serve_forever()
+
+Thread(target=run_server).start()
