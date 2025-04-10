@@ -1,8 +1,7 @@
-# main.py
 import os
 import time
 import requests
-from deep_translator import LibreTranslateTranslator
+from deep_translator import MyMemoryTranslator
 from atproto import Client
 import schedule
 
@@ -13,8 +12,8 @@ BLSKY_APP_PASSWORD = os.environ['BLSKY_APP_PASSWORD']
 # Keep track of seen alert IDs
 seen_ids = set()
 
-# Set up translation
-translator = LibreTranslateTranslator(source='en', target='es')
+# Set up translation (English to Spanish)
+translator = MyMemoryTranslator(source='en', target='es')
 
 # Set up Bluesky client
 client = Client()
@@ -40,33 +39,30 @@ def fetch_and_post_alerts():
             if not headline or not description:
                 continue
 
+            # Translate headline and part of description
             translated_headline = translator.translate(headline)
-            translated_description = translator.translate(description[:800])
-            
-            post_text = f"\ud83c\udf0a Alerta meteorol\u00f3gica para {area}:\n\n{translated_headline}\n\n{translated_description}"
+            translated_description = translator.translate(description[:800])  # NWS descriptions can be long
+
+            post_text = f"🌊 Alerta meteorológica para {area}:\n\n{translated_headline}\n\n{translated_description}"
 
             # Post to Bluesky
             client.send_post(text=post_text)
-            print(f"Posted alert: {translated_headline}")
+            print(f"✅ Posted alert: {translated_headline}")
 
             seen_ids.add(alert_id)
-            time.sleep(2)  # small delay to avoid spamming
+            time.sleep(2)  # avoid spamming
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
 
 # Schedule to run every 10 minutes
 schedule.every(10).minutes.do(fetch_and_post_alerts)
 
-print("Weather alert bot is running...")
+print("✅ Weather alert bot is running...")
 fetch_and_post_alerts()
 
-while True:
-    schedule.run_pending()
-    time.sleep(30)
-
-# Fake HTTP server to keep Render Web Service alive
-from threading import Thread
+# Keep the schedule running and host a fake server
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 class Handler(BaseHTTPRequestHandler):
@@ -79,4 +75,10 @@ def run_server():
     server = HTTPServer(('0.0.0.0', 10000), Handler)
     server.serve_forever()
 
-Thread(target=run_server).start()
+# Start the fake server in a background thread
+threading.Thread(target=run_server, daemon=True).start()
+
+# Keep bot running with schedule
+while True:
+    schedule.run_pending()
+    time.sleep(30)
