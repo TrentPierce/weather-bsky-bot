@@ -1,0 +1,4 @@
+requests
+deep_translator
+atproto
+schedule
