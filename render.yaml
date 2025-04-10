@@ -1,2 +1,7 @@
 services:
-  - type: worker
+  - type: web
+    name: weather-bsky-bot
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
