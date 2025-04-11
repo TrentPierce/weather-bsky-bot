@@ -49,7 +49,9 @@ def fetch_and_post_alerts():
             translated_headline = translator.translate(headline)
             translated_description = translator.translate(description[:800])
 
-            post_text = f"\U0001F30A Alerta meteorol\u00f3gica para {area}:\n\n{translated_headline}\n\n{translated_description}"
+            raw_text = f"🌊 Alerta meteorológica para {area}:\n\n{translated_headline}\n\n{translated_description}"
+            post_text = raw_text[:280] + "…" if len(raw_text) > 300 else raw_text
+
 
             client.send_post(text=post_text)
             logging.info(f"✅ Posted alert: {translated_headline}")
@@ -77,7 +79,9 @@ def post_day1_outlook():
         image.save("day1_outlook.gif")
 
         with open("day1_outlook.gif", "rb") as f:
-            image_blob = client.com.atproto.repo.upload_blob(f)
+            response = client.com.atproto.repo.upload_blob(f)
+            image_blob = response.blob
+
 
         client.app.bsky.feed.post(models.AppBskyFeedPost(
             text=caption,
