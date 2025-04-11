@@ -8,7 +8,6 @@ from io import BytesIO
 from deep_translator import MyMemoryTranslator
 from atproto import Client
 from atproto import models
-from atproto.exceptions import UnknownError
 
 bsky_identifier = os.getenv("BSKY_IDENTIFIER")
 bsky_password = os.getenv("BSKY_PASSWORD")
