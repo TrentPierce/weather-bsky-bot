@@ -80,8 +80,8 @@ def post_day1_outlook():
         response.raise_for_status()
 
         img_bytes = BytesIO(response.content)
-        image = Image.open(img_bytes)
-        image.save("day1_outlook.gif")
+        with open("day1_outlook.gif", "wb") as f:
+            f.write(img_bytes.getbuffer())
 
         with open("day1_outlook.gif", "rb") as f:
             upload_response = client.com.atproto.repo.upload_blob(f)
