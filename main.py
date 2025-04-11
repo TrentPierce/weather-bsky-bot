@@ -1,27 +1,34 @@
 import os
 import time
+import logging
+import datetime
 import requests
+from PIL import Image
+from io import BytesIO
 from deep_translator import MyMemoryTranslator
 from atproto import Client
-import schedule
+from atproto import models
+from atproto.exceptions import UnknownError
 
-# Load config from environment variables
-BLSKY_HANDLE = os.environ['BLSKY_HANDLE']
-BLSKY_APP_PASSWORD = os.environ['BLSKY_APP_PASSWORD']
+bsky_identifier = os.getenv("BSKY_IDENTIFIER")
+bsky_password = os.getenv("BSKY_PASSWORD")
 
-# Keep track of seen alert IDs
+client = Client()
+client.login(bsky_identifier, bsky_password)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+
+translator = MyMemoryTranslator(source='en-US', target='es-MX')
 seen_ids = set()
 
-# Set up translation (English to Spanish)
-translator = MyMemoryTranslator(source='en-US', target='es-MX')
-
-
-# Set up Bluesky client
-client = Client()
-client.login(BLSKY_HANDLE, BLSKY_APP_PASSWORD)
-
 def fetch_and_post_alerts():
-    print("Checking for new alerts...")
+    logging.info("Checking for new alerts...")
     try:
         response = requests.get("https://api.weather.gov/alerts/active")
         alerts = response.json().get("features", [])
@@ -40,46 +47,68 @@ def fetch_and_post_alerts():
             if not headline or not description:
                 continue
 
-            # Translate headline and part of description
             translated_headline = translator.translate(headline)
-            translated_description = translator.translate(description[:800])  # NWS descriptions can be long
+            translated_description = translator.translate(description[:800])
 
-            post_text = f"🌊 Alerta meteorológica para {area}:\n\n{translated_headline}\n\n{translated_description}"
+            post_text = f"\U0001F30A Alerta meteorol\u00f3gica para {area}:\n\n{translated_headline}\n\n{translated_description}"
 
-            # Post to Bluesky
             client.send_post(text=post_text)
-            print(f"✅ Posted alert: {translated_headline}")
+            logging.info(f"✅ Posted alert: {translated_headline}")
 
             seen_ids.add(alert_id)
-            time.sleep(2)  # avoid spamming
+            time.sleep(2)
 
     except Exception as e:
-        print(f"❌ Error: {e}")
+        logging.error(f"❌ Error: {e}")
 
-# Schedule to run every 10 minutes
-schedule.every(10).minutes.do(fetch_and_post_alerts)
+def post_day1_outlook():
+    logging.info("Fetching the latest SPC Day 1 Outlook...")
 
-print("✅ Weather alert bot is running...")
-fetch_and_post_alerts()
+    outlook_url = "https://www.spc.noaa.gov/products/outlook/day1otlk.gif"
+    caption_en = "\U0001F300 Latest Day 1 Severe Weather Outlook from @NWSSPC\n#weather #SPC"
+    caption_es = translator.translate("Latest Day 1 Severe Weather Outlook from @NWSSPC")
+    caption = f"\U0001F300 {caption_es}\n#clima #SPC"
 
-# Keep the schedule running and host a fake server
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+    try:
+        response = requests.get(outlook_url)
+        response.raise_for_status()
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b'Weather bot is running!')
+        img_bytes = BytesIO(response.content)
+        image = Image.open(img_bytes)
+        image.save("day1_outlook.gif")
 
-def run_server():
-    server = HTTPServer(('0.0.0.0', 10000), Handler)
-    server.serve_forever()
+        with open("day1_outlook.gif", "rb") as f:
+            image_blob = client.com.atproto.repo.upload_blob(f)
 
-# Start the fake server in a background thread
-threading.Thread(target=run_server, daemon=True).start()
+        client.app.bsky.feed.post(models.AppBskyFeedPost(
+            text=caption,
+            embed=models.AppBskyEmbedImages.Main(images=[
+                models.AppBskyEmbedImages.Image(
+                    image=image_blob,
+                    alt="SPC Day 1 Convective Outlook"
+                )
+            ])
+        ))
 
-# Keep bot running with schedule
-while True:
-    schedule.run_pending()
-    time.sleep(30)
+        logging.info("Posted Day 1 SPC Outlook to Bluesky.")
+    except Exception as e:
+        logging.error(f"Failed to fetch or post SPC outlook: {e}")
+
+def main():
+    logging.info("Bot started and running...")
+    last_post_date = None
+
+    while True:
+        logging.info("Heartbeat - bot is alive and checking...")
+        now = datetime.datetime.utcnow()
+
+        fetch_and_post_alerts()
+
+        if last_post_date != now.date() and now.hour >= 12:
+            post_day1_outlook()
+            last_post_date = now.date()
+
+        time.sleep(300)
+
+if __name__ == "__main__":
+    main()
