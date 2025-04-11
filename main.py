@@ -9,8 +9,8 @@ from deep_translator import MyMemoryTranslator
 from atproto import Client
 from atproto import models
 
-bsky_identifier = os.getenv("BSKY_IDENTIFIER")
-bsky_password = os.getenv("BSKY_PASSWORD")
+bsky_identifier = os.getenv("BLSKY_HANDLE")
+bsky_password = os.getenv("BLSKY_APP_PASSWORD")
 
 client = Client()
 client.login(bsky_identifier, bsky_password)
