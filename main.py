@@ -9,8 +9,8 @@ from deep_translator import MyMemoryTranslator
 from atproto import Client
 from atproto import models
 
-bsky_identifier = os.getenv("BLSKY_HANDLE")
-bsky_password = os.getenv("BLSKY_APP_PASSWORD")
+bsky_identifier = os.getenv("BSKY_HANDLE")
+bsky_password = os.getenv("BSKY_APP_PASSWORD")
 
 client = Client()
 client.login(bsky_identifier, bsky_password)
@@ -26,6 +26,8 @@ logging.basicConfig(
 translator = MyMemoryTranslator(source='en-US', target='es-MX')
 seen_ids = set()
 
+ALLOWED_EVENT_TYPES = ["Flood", "Tornado", "Thunderstorm"]
+
 def fetch_and_post_alerts():
     logging.info("Checking for new alerts...")
     try:
@@ -39,6 +41,10 @@ def fetch_and_post_alerts():
             if alert_id in seen_ids:
                 continue
 
+            event_type = properties.get('event', '')
+            if not any(event in event_type for event in ALLOWED_EVENT_TYPES):
+                continue
+
             headline = properties.get('headline', '')
             description = properties.get('description', '')
             area = properties.get('areaDesc', '')
@@ -49,9 +55,8 @@ def fetch_and_post_alerts():
             translated_headline = translator.translate(headline)
             translated_description = translator.translate(description[:800])
 
-            raw_text = f"🌊 Alerta meteorológica para {area}:\n\n{translated_headline}\n\n{translated_description}"
+            raw_text = f"\U0001F30A Alerta meteorol\u00f3gica para {area}:\n\n\n{translated_headline}\n\n{translated_description}"
             post_text = raw_text[:280] + "…" if len(raw_text) > 300 else raw_text
-
 
             client.send_post(text=post_text)
             logging.info(f"✅ Posted alert: {translated_headline}")
@@ -79,9 +84,8 @@ def post_day1_outlook():
         image.save("day1_outlook.gif")
 
         with open("day1_outlook.gif", "rb") as f:
-            response = client.com.atproto.repo.upload_blob(f)
-            image_blob = response.blob
-
+            upload_response = client.com.atproto.repo.upload_blob(f)
+            image_blob = upload_response.blob
 
         client.app.bsky.feed.post(models.AppBskyFeedPost(
             text=caption,
